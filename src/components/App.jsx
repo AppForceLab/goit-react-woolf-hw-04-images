@@ -1,74 +1,61 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Searchbar from './Searchbar/Searchbar';
 import ImageGallery from './ImageGallery/ImageGallery';
 import Button from './Button/Button';
-import { Fancybox } from '@fancyapps/ui';
 import Loader from './Loader/Loader';
-import fetchImagesFromApi from 'api/api';
 import '@fancyapps/ui/dist/fancybox/fancybox.css';
 import './App.css';
+import { Fancybox } from '@fancyapps/ui';
+import fetchImagesFromApi from 'api/api';
 
-class App extends React.Component {
-  state = {
-    images: [],
-    currentPage: 1,
-    searchTerm: '',
-    loading: false,
-    showModal: false,
-    modalImageSrc: '',
-    showButton: false,
+const App = () => {
+  const [images, setImages] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [showButton, setShowButton] = useState(false);
+
+  useEffect(() => {
+    if (!searchTerm) return;
+
+    const fetchImages = async () => {
+      setLoading(true);
+      try {
+        const { hits, totalHits } = await fetchImagesFromApi(searchTerm, currentPage);
+        setImages(prev => [...prev, ...hits]);
+        setShowButton(currentPage < Math.ceil(totalHits / 12));
+      } catch (error) {
+        console.error('Error fetching images:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchImages();
+  }, [searchTerm, currentPage]);
+
+  const handleSearchSubmit = searchTerm => {
+    setSearchTerm(searchTerm);
+    setImages([]);
+    setCurrentPage(1);
   };
 
-  componentDidUpdate(prevProps, prevState) {
-    if (
-      prevState.searchTerm !== this.state.searchTerm ||
-      prevState.currentPage !== this.state.currentPage
-    ) {
-      this.fetchImages(this.state.searchTerm, this.state.currentPage);
-    }
-  }
+  const handleLoadMore = () => {
+    setCurrentPage(prevPage => prevPage + 1);
+  };
 
-  openLightbox = imageSrc => {
+  const openLightbox = imageSrc => {
     Fancybox.show([{ src: imageSrc, type: 'image' }]);
   };
 
-  fetchImages = async (searchTerm, page = 1) => {
-    this.setState({ loading: true });
-
-    try {
-      const { hits, totalHits } = await fetchImagesFromApi(searchTerm, page);
-      this.setState(prevState => ({
-        images: [...prevState.images, ...hits],
-        loading: false,
-        showButton: page < Math.ceil(totalHits / 12),
-      }));
-    } catch (error) {
-      console.error('Error fetching images:', error);
-      this.setState({ loading: false });
-    }
-  };
-
-  handleSearchSubmit = searchTerm => {
-    this.setState({ searchTerm, currentPage: 1, images: [] });
-  };
-
-  handleLoadMore = () => {
-    this.setState(prevState => ({ currentPage: prevState.currentPage + 1 }));
-  };
-
-  render() {
-    const { images, loading, showButton } = this.state;
-    return (
-      <div className="App">
-        <Searchbar onSubmit={this.handleSearchSubmit} />
-        <ImageGallery images={images} openLightbox={this.openLightbox} />
-        {loading && <Loader />}
-        {showButton && (
-          <Button onClick={this.handleLoadMore} />
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className="App">
+      <Searchbar onSubmit={handleSearchSubmit} />
+      <ImageGallery images={images} openLightbox={openLightbox} />
+      {loading && <Loader />}
+      {showButton && <Button onClick={handleLoadMore} />}
+    </div>
+  );
+};
 
 export default App;
